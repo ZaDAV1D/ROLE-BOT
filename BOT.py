@@ -18,28 +18,120 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# ---------------- BOT ----------------
+# ---------------- BOT CONFIG ----------------
 
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = 1514929528194207764
 
 ROLE_MAP = {
-    1514928475906244669: 1514345512101216306,  # VALORANT
-    1514928326303809589: 1514928778785198240,  # ROBLOX
-    1514928148062404703: 1514345509706273079,  # CS
-    1514928010023927910: 1514928927083204618,  # FIVEM
-    1514927916419518555: 1514929046054633565,  # GTA
+    "valorant": 1514345512101216306,
+    "roblox": 1514928778785198240,
+    "cs": 1514345509706273079,
+    "fivem": 1514928927083204618,
+    "gta": 1514929046054633565,
 }
 
 intents = discord.Intents.default()
 intents.members = True
-intents.reactions = True
-intents.guilds = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 ROLE_MESSAGE_ID = None
 
+
+# ---------------- CONFIRM REMOVE VIEW ----------------
+
+class ConfirmRemoveView(discord.ui.View):
+    def __init__(self, member, role):
+        super().__init__(timeout=30)
+        self.member = member
+        self.role = role
+
+    @discord.ui.button(label="Yes, remove", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+        if interaction.user != self.member:
+            await interaction.response.send_message("❌ זה לא שלך.", ephemeral=True)
+            return
+
+        await self.member.remove_roles(self.role)
+
+        await interaction.response.edit_message(
+            content=f"❌ Removed role: **{self.role.name}**",
+            view=None
+        )
+
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+        if interaction.user != self.member:
+            await interaction.response.send_message("❌ זה לא שלך.", ephemeral=True)
+            return
+
+        await interaction.response.edit_message(
+            content="👍 פעולה בוטלה",
+            view=None
+        )
+
+        self.stop()
+
+
+# ---------------- ROLE VIEW (MAIN BUTTONS) ----------------
+
+class RoleView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def handle_role(self, interaction: discord.Interaction, role_key: str):
+        guild = interaction.guild
+        member = interaction.user
+        role = guild.get_role(ROLE_MAP[role_key])
+
+        if role is None:
+            await interaction.response.send_message("❌ Role not found", ephemeral=True)
+            return
+
+        # אם יש רול → שואל לפני הסרה
+        if role in member.roles:
+            view = ConfirmRemoveView(member, role)
+
+            await interaction.response.send_message(
+                f"❓ אתה בטוח שאתה רוצה להסיר את **{role.name}**?",
+                view=view,
+                ephemeral=True
+            )
+        else:
+            await member.add_roles(role)
+
+            await interaction.response.send_message(
+                f"✅ Added role: **{role.name}**",
+                ephemeral=True
+            )
+
+    @discord.ui.button(label="Valorant", style=discord.ButtonStyle.green)
+    async def valorant(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_role(interaction, "valorant")
+
+    @discord.ui.button(label="Roblox", style=discord.ButtonStyle.blurple)
+    async def roblox(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_role(interaction, "roblox")
+
+    @discord.ui.button(label="CS", style=discord.ButtonStyle.red)
+    async def cs(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_role(interaction, "cs")
+
+    @discord.ui.button(label="FiveM", style=discord.ButtonStyle.gray)
+    async def fivem(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_role(interaction, "fivem")
+
+    @discord.ui.button(label="GTA", style=discord.ButtonStyle.green)
+    async def gta(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_role(interaction, "gta")
+
+
+# ---------------- BOT READY ----------------
 
 @bot.event
 async def on_ready():
@@ -49,56 +141,19 @@ async def on_ready():
 
     channel = await bot.fetch_channel(CHANNEL_ID)
 
-    # שולח הודעה פעם אחת בכל ריסטארט (פשוט ויעיל)
     embed = discord.Embed(
         title="🎮 Game Roles",
-        description=(
-            "<:VALORANT:1514928475906244669> Valorant\n"
-            "<:ROBLOX:1514928326303809589> Roblox\n"
-            "<:CS:1514928148062404703> CS\n"
-            "<:FIVEM:1514928010023927910> FiveM\n"
-            "<:GTA:1514927916419518555> GTA V\n\n"
-            "React to get roles"
-        )
+        description="לחץ על כפתור כדי לקבל או להסיר Role"
     )
 
-    msg = await channel.send(embed=embed)
+    view = RoleView()
+
+    msg = await channel.send(embed=embed, view=view)
     ROLE_MESSAGE_ID = msg.id
 
-    print("Role message sent:", ROLE_MESSAGE_ID)
+    print("Role button panel sent")
 
 
-@bot.event
-async def on_raw_reaction_add(payload):
-    if payload.message_id != ROLE_MESSAGE_ID:
-        return
-
-    if payload.user_id == bot.user.id:
-        return
-
-    guild = bot.get_guild(payload.guild_id)
-    member = guild.get_member(payload.user_id) or await guild.fetch_member(payload.user_id)
-
-    role_id = ROLE_MAP.get(payload.emoji.id)
-    if role_id:
-        role = guild.get_role(role_id)
-        if role:
-            await member.add_roles(role)
-
-
-@bot.event
-async def on_raw_reaction_remove(payload):
-    if payload.message_id != ROLE_MESSAGE_ID:
-        return
-
-    guild = bot.get_guild(payload.guild_id)
-    member = guild.get_member(payload.user_id) or await guild.fetch_member(payload.user_id)
-
-    role_id = ROLE_MAP.get(payload.emoji.id)
-    if role_id:
-        role = guild.get_role(role_id)
-        if role:
-            await member.remove_roles(role)
-
+# ---------------- RUN BOT ----------------
 
 bot.run(TOKEN)
