@@ -29,6 +29,9 @@ ROLE_MAP = {
     "cs": 1514345509706273079,
     "fivem": 1514928927083204618,
     "gta": 1514929046054633565,
+    "myzoo": 1515454287482978465,
+    "minecraft": 1515454436674375710,
+    "fortnite": 1515454208546181311,
 }
 
 intents = discord.Intents.default()
@@ -37,7 +40,6 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 ROLE_MESSAGE_ID = None
-
 
 # ---------------- CONFIRM REMOVE VIEW ----------------
 
@@ -77,8 +79,7 @@ class ConfirmRemoveView(discord.ui.View):
 
         self.stop()
 
-
-# ---------------- ROLE VIEW (MAIN BUTTONS) ----------------
+# ---------------- ROLE VIEW ----------------
 
 class RoleView(discord.ui.View):
     def __init__(self):
@@ -93,7 +94,6 @@ class RoleView(discord.ui.View):
             await interaction.response.send_message("❌ Role not found", ephemeral=True)
             return
 
-        # אם יש רול → שואל לפני הסרה
         if role in member.roles:
             view = ConfirmRemoveView(member, role)
 
@@ -130,6 +130,17 @@ class RoleView(discord.ui.View):
     async def gta(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_role(interaction, "gta")
 
+    @discord.ui.button(label="My Zoo Voice", style=discord.ButtonStyle.gray)
+    async def myzoo(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_role(interaction, "myzoo")
+
+    @discord.ui.button(label="Minecraft", style=discord.ButtonStyle.blurple)
+    async def minecraft(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_role(interaction, "minecraft")
+
+    @discord.ui.button(label="Fortnite", style=discord.ButtonStyle.green)
+    async def fortnite(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_role(interaction, "fortnite")
 
 # ---------------- BOT READY ----------------
 
@@ -153,7 +164,6 @@ async def on_ready():
 
     print("Role button panel sent")
 
-
-# ---------------- RUN BOT ----------------
+# ---------------- RUN ----------------
 
 bot.run(TOKEN)
